@@ -1,6 +1,9 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
 
+use std::alloc::System;
+use std::time::SystemTime;
+
 use crate::gui::Framework;
 use log::error;
 use pixels::{Error, Pixels, SurfaceTexture};
@@ -11,18 +14,11 @@ use winit::window::WindowBuilder;
 use winit_input_helper::WinitInputHelper;
 
 mod gui;
+mod canvas;
+mod tools;
 
 const WIDTH: u32 = 640;
 const HEIGHT: u32 = 480;
-const BOX_SIZE: i16 = 64;
-
-/// Representation of the application state. In this example, a box will bounce around the screen.
-struct World {
-    box_x: i16,
-    box_y: i16,
-    velocity_x: i16,
-    velocity_y: i16,
-}
 
 fn main() -> Result<(), Error> {
     env_logger::init();
@@ -31,7 +27,7 @@ fn main() -> Result<(), Error> {
     let window = {
         let size = LogicalSize::new(WIDTH as f64, HEIGHT as f64);
         WindowBuilder::new()
-            .with_title("Hello Pixels + egui")
+            .with_title("Rustpaint")
             .with_inner_size(size)
             .with_min_inner_size(size)
             .build(&event_loop)
@@ -48,17 +44,49 @@ fn main() -> Result<(), Error> {
 
         (pixels, framework)
     };
-    let mut world = World::new();
+    let mut canvas = canvas::Canvas::new(HEIGHT, WIDTH);
+    let mut tool = tools::Tool::Pen;
 
+    //let mut time = SystemTime::now();
     event_loop.run(move |event, _, control_flow| {
+        let start_time = SystemTime::now();
         // Handle input events
         if input.update(&event) {
+            //let new_time = SystemTime::now();
+            //println!("time since last eventloop iteration {:?}", new_time.duration_since(time));
+            //time = new_time;
             // Close events
             if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
                 *control_flow = ControlFlow::Exit;
                 return;
             }
 
+            if input.key_pressed(VirtualKeyCode::P){
+                tool = tools::Tool::Pen;
+            }
+
+            if input.key_pressed(VirtualKeyCode::E){
+                tool = tools::Tool::Ereaser;
+            }
+
+            if input.mouse_released(0) {
+                println!("mouse released at {:?}", input.mouse().unwrap());
+            }
+
+            if input.mouse_pressed(0) {
+                let pos = input.mouse().unwrap();
+                let x = (pos.0 / window.scale_factor() as f32) as u32;
+                let y = (pos.1 / window.scale_factor() as f32) as u32;
+                tools::draw(&mut canvas, &tool, (x, y));
+            }
+
+            if input.mouse_held(0) {
+                let pos = input.mouse().unwrap();
+                let x = (pos.0 / window.scale_factor() as f32) as u32;
+                let y = (pos.1 / window.scale_factor() as f32) as u32;
+                tools::draw(&mut canvas, &tool, (x, y));
+            }
+            
             // Update the scale factor
             if let Some(scale_factor) = input.scale_factor() {
                 framework.scale_factor(scale_factor);
@@ -69,9 +97,7 @@ fn main() -> Result<(), Error> {
                 pixels.resize_surface(size.width, size.height);
                 framework.resize(size.width, size.height);
             }
-
-            // Update internal state and request a redraw
-            world.update();
+            
             window.request_redraw();
         }
 
@@ -83,7 +109,7 @@ fn main() -> Result<(), Error> {
             // Draw the current frame
             Event::RedrawRequested(_) => {
                 // Draw the world
-                world.draw(pixels.get_frame());
+                canvas.canvas_to_frame(pixels.get_frame());
 
                 // Prepare egui
                 framework.prepare(&window);
@@ -109,53 +135,6 @@ fn main() -> Result<(), Error> {
             }
             _ => (),
         }
+        println!("eventlook took: {:?}", SystemTime::now().duration_since(start_time));
     });
-}
-
-impl World {
-    /// Create a new `World` instance that can draw a moving box.
-    fn new() -> Self {
-        Self {
-            box_x: 24,
-            box_y: 16,
-            velocity_x: 1,
-            velocity_y: 1,
-        }
-    }
-
-    /// Update the `World` internal state; bounce the box around the screen.
-    fn update(&mut self) {
-        if self.box_x <= 0 || self.box_x + BOX_SIZE > WIDTH as i16 {
-            self.velocity_x *= -1;
-        }
-        if self.box_y <= 0 || self.box_y + BOX_SIZE > HEIGHT as i16 {
-            self.velocity_y *= -1;
-        }
-
-        self.box_x += self.velocity_x;
-        self.box_y += self.velocity_y;
-    }
-
-    /// Draw the `World` state to the frame buffer.
-    ///
-    /// Assumes the default texture format: `wgpu::TextureFormat::Rgba8UnormSrgb`
-    fn draw(&self, frame: &mut [u8]) {
-        for (i, pixel) in frame.chunks_exact_mut(4).enumerate() {
-            let x = (i % WIDTH as usize) as i16;
-            let y = (i / WIDTH as usize) as i16;
-
-            let inside_the_box = x >= self.box_x
-                && x < self.box_x + BOX_SIZE
-                && y >= self.box_y
-                && y < self.box_y + BOX_SIZE;
-
-            let rgba = if inside_the_box {
-                [0x5e, 0x48, 0xe8, 0xff]
-            } else {
-                [0x48, 0xb2, 0xe8, 0xff]
-            };
-
-            pixel.copy_from_slice(&rgba);
-        }
-    }
 }
