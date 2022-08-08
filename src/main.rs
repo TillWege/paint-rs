@@ -1,12 +1,11 @@
 #![deny(clippy::all)]
 #![forbid(unsafe_code)]
-
-use std::alloc::System;
 use std::time::SystemTime;
 
 use crate::gui::Framework;
+use egui_wgpu::wgpu::{RequestAdapterOptions, PowerPreference, PresentMode};
 use log::error;
-use pixels::{Error, Pixels, SurfaceTexture};
+use pixels::{Error, SurfaceTexture, PixelsBuilder};
 use winit::dpi::LogicalSize;
 use winit::event::{Event, VirtualKeyCode};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -38,7 +37,17 @@ fn main() -> Result<(), Error> {
         let window_size = window.inner_size();
         let scale_factor = window.scale_factor() as f32;
         let surface_texture = SurfaceTexture::new(window_size.width, window_size.height, &window);
-        let pixels = Pixels::new(WIDTH, HEIGHT, surface_texture)?;
+        //v1
+        //let pixels = Pixels::new(WIDTH, HEIGHT, surface_texture)?;
+        let pixels = PixelsBuilder::new(WIDTH, HEIGHT, surface_texture)
+            .request_adapter_options(RequestAdapterOptions {
+                power_preference: PowerPreference::HighPerformance,
+                force_fallback_adapter: false,
+                compatible_surface: None,
+            })
+            .present_mode(PresentMode::Immediate)
+            .enable_vsync(false)
+            .build()?;
         let framework =
             Framework::new(window_size.width, window_size.height, scale_factor, &pixels);
 
@@ -46,16 +55,12 @@ fn main() -> Result<(), Error> {
     };
     let mut canvas = canvas::Canvas::new(HEIGHT, WIDTH);
     let mut tool = tools::Tool::Pen;
+    let tool_size: i32 = 5; // todo make dyn 
 
     //let mut time = SystemTime::now();
     event_loop.run(move |event, _, control_flow| {
-        let start_time = SystemTime::now();
         // Handle input events
         if input.update(&event) {
-            //let new_time = SystemTime::now();
-            //println!("time since last eventloop iteration {:?}", new_time.duration_since(time));
-            //time = new_time;
-            // Close events
             if input.key_pressed(VirtualKeyCode::Escape) || input.quit() {
                 *control_flow = ControlFlow::Exit;
                 return;
@@ -75,16 +80,16 @@ fn main() -> Result<(), Error> {
 
             if input.mouse_pressed(0) {
                 let pos = input.mouse().unwrap();
-                let x = (pos.0 / window.scale_factor() as f32) as u32;
-                let y = (pos.1 / window.scale_factor() as f32) as u32;
-                tools::draw(&mut canvas, &tool, (x, y));
+                let x = (pos.0 / window.scale_factor() as f32) as i32;
+                let y = (pos.1 / window.scale_factor() as f32) as i32;
+                tools::draw(&mut canvas, &tool, tool_size, (x, y));
             }
 
             if input.mouse_held(0) {
                 let pos = input.mouse().unwrap();
-                let x = (pos.0 / window.scale_factor() as f32) as u32;
-                let y = (pos.1 / window.scale_factor() as f32) as u32;
-                tools::draw(&mut canvas, &tool, (x, y));
+                let x = (pos.0 / window.scale_factor() as f32) as i32;
+                let y = (pos.1 / window.scale_factor() as f32) as i32;
+                tools::draw(&mut canvas, &tool, tool_size, (x, y));
             }
             
             // Update the scale factor
@@ -108,6 +113,7 @@ fn main() -> Result<(), Error> {
             }
             // Draw the current frame
             Event::RedrawRequested(_) => {
+                let start_time = SystemTime::now();
                 // Draw the world
                 canvas.canvas_to_frame(pixels.get_frame());
 
@@ -132,9 +138,10 @@ fn main() -> Result<(), Error> {
                 {
                     *control_flow = ControlFlow::Exit;
                 }
+
+                println!("Rendering took: {:?}", SystemTime::now().duration_since(start_time));
             }
             _ => (),
         }
-        println!("eventlook took: {:?}", SystemTime::now().duration_since(start_time));
     });
 }
