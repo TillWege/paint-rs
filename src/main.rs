@@ -54,7 +54,7 @@ fn main() -> Result<(), Error> {
         (pixels, framework)
     };
     let mut canvas = canvas::Canvas::new(HEIGHT, WIDTH);
-    let mut tool = tools::Tool::Pen;
+    let mut tool = tools::Tool::new();
     let tool_size: i32 = 5; // todo make dyn 
 
     //let mut time = SystemTime::now();
@@ -67,29 +67,36 @@ fn main() -> Result<(), Error> {
             }
 
             if input.key_pressed(VirtualKeyCode::P){
-                tool = tools::Tool::Pen;
+                tool.mode = tools::ToolType::Pen;
             }
 
             if input.key_pressed(VirtualKeyCode::E){
-                tool = tools::Tool::Ereaser;
+                tool.mode = tools::ToolType::Ereaser;
             }
 
             if input.mouse_released(0) {
-                println!("mouse released at {:?}", input.mouse().unwrap());
+                tool.state = tools::ToolState::Up;
             }
 
             if input.mouse_pressed(0) {
-                let pos = input.mouse().unwrap();
-                let x = (pos.0 / window.scale_factor() as f32) as i32;
-                let y = (pos.1 / window.scale_factor() as f32) as i32;
-                tools::draw(&mut canvas, &tool, tool_size, (x, y));
+                tool.state = tools::ToolState::Down;
+                // let pos = input.mouse().unwrap();
+                // let x = (pos.0 / window.scale_factor() as f32) as i32;
+                // let y = (pos.1 / window.scale_factor() as f32) as i32;
+                // tools::draw(&mut canvas, &tool, tool_size, (x, y));
             }
 
             if input.mouse_held(0) {
+                // let pos = input.mouse().unwrap();
+                // let x = (pos.0 / window.scale_factor() as f32) as i32;
+                // let y = (pos.1 / window.scale_factor() as f32) as i32;
+                // tools::draw(&mut canvas, &tool, tool_size, (x, y));
+            }
+
+            if input.mouse().is_some() {
                 let pos = input.mouse().unwrap();
-                let x = (pos.0 / window.scale_factor() as f32) as i32;
-                let y = (pos.1 / window.scale_factor() as f32) as i32;
-                tools::draw(&mut canvas, &tool, tool_size, (x, y));
+                let x = pos.0.round() as u32;
+                let y = pos.1.round() as u32;
             }
             
             // Update the scale factor
@@ -139,7 +146,7 @@ fn main() -> Result<(), Error> {
                     *control_flow = ControlFlow::Exit;
                 }
 
-                println!("Rendering took: {:?}", SystemTime::now().duration_since(start_time));
+                //println!("Rendering took: {:?}", SystemTime::now().duration_since(start_time));
             }
             _ => (),
         }

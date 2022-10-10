@@ -1,12 +1,37 @@
 use crate::canvas::{Canvas, screen_to_canvas};
 
-pub enum Tool{
+pub enum ToolType {
     Pen,
     Ereaser
 }
 
-pub fn draw(canvas: &mut Canvas, tool: &Tool, tool_size: i32, pos: (i32, i32)){
+#[derive(PartialEq)]
+pub enum ToolState {
+    Up,
+    Down
+}
 
+pub struct Tool{
+    pub mode: ToolType,
+    pub size: usize,
+    pub state: ToolState,
+    pub position: (u32, u32)
+}
+
+impl Tool{
+
+    pub fn new() -> Self {
+        Tool{
+            mode: ToolType::Pen,
+            size: 5,
+            state: ToolState::Up,
+            position: (0,0)
+        }
+    }
+
+}
+
+pub fn draw(canvas: &mut Canvas, tool: &Tool, tool_size: i32, pos: (i32, i32)){
     // get all pixels inside a circle with r = tool_size and center = pos
     // make sure you dont overflow in width to prevent wraparound
     // make sure to prevent overflow of index
@@ -31,11 +56,11 @@ pub fn draw(canvas: &mut Canvas, tool: &Tool, tool_size: i32, pos: (i32, i32)){
 
     for index in bounding_box {
         //let canvas_pos = screen_to_canvas(pos.0, pos.1, canvas);
-        match tool {
-            Tool::Pen => {
+        match tool.mode {
+            ToolType::Pen => {
                 canvas.set_pixel(index, 0x00000000);
             },
-            Tool::Ereaser => {
+            ToolType::Ereaser => {
                 canvas.set_pixel(index, 0xFFFFFFFF);
             },
         }
